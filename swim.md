@@ -73,3 +73,11 @@
   - Initalized to 0 on member startup
   - Incremented only by local process when information about itself being suspected is seen in Dissemination Component
   - Sends *Alive* message with identifier and incremented incarnation number
+### 4.3 Round-Robin Probe Target Selection: Providing Time-Bounded Strong Completeness
+- The basic SWIM failure detector protocol detects failures in an average constant number of protocol periods
+- In the pathological case, there may be large delay in first detection of a failed process
+  - In the extreme case, the delay is unbounded
+- Instead, select *ping* targets sequentially from list
+  - New members are inserted randomly in list
+  - When list has been traversed, list is shuffled
+  - Sending *ping* messages is at most (2xn - 1, `n` is number of members) protocol periods apart
