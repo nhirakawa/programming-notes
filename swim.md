@@ -1,4 +1,6 @@
-# SWIM ([link to paper](https://www.cs.cornell.edu/~asdas/research/dsn02-swim.pdf))
+# SWIM 
+
+#### https://www.cs.cornell.edu/~asdas/research/dsn02-swim.pdf
 
 ## Previous work
 
