@@ -2,7 +2,7 @@
 
 #### https://www.cs.cornell.edu/~asdas/research/dsn02-swim.pdf
 
-## Previous work
+## 2. Previous work
 
 - Previous implementations rely either on:
   - Sending periodic heartbeats to every other node in the cluster
