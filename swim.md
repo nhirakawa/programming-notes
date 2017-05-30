@@ -53,3 +53,23 @@
   - Members not yet declared failed in the group
   - Members that have failed recently
   - Equal number from each list are chosen to attach to a message (but could be adapted)
+### 4.2 Suspicion Mechanism: Reducing the Frequency of False Positives
+- If a member failure is detected by a single member, it is forced out of the group
+  - Leads to high rate of false positives
+- Run *Suspicion* subprotocol when failure is first detected
+  - If at end of normal *SWIM* failure detection protocol *M<sub>j</sub>* is detected as failed
+    - Marked as *suspected* in local membership list
+    - `{Mj suspected by Mi}` message disseminated through group through Dissemination Component
+    - Other processes also mark *M<sub>j</sub>* as suspected in local membership lists
+    - Suspected processes stay in membership lists, treated similarly to non-faulty members
+- If *M<sub>l</sub>* successfully *ping*s *M<sub>j</sub>*, it disseminates a `{Ml knows Mj is alive}` messages
+  - An *Alive* message un-marks the process as *suspected*
+  - Similarly, if *M<sub>j</sub>* sees that it is suspected, it can disseminate its own *Alive* message
+- Suspected members expire after timeout
+- If after timeout, *M<sub>h</sub>* hasn't seen an *Alive* message, it sends a `{Mh declares Mj as faulty}` message
+  - Overrides previous *Suspect* and *Alive* messages
+- *Alive* overrides *Suspect*, *Confirm* overrides *Alive* and *Suspect*
+- Unique *incarnation number*s are needed to distinguish between multiple message types for a single process (over group lifetime)
+  - Initalized to 0 on member startup
+  - Incremented only by local process when information about itself being suspected is seen in Dissemination Component
+  - Sends *Alive* message with identifier and incremented incarnation number
