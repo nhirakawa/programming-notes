@@ -80,4 +80,4 @@
 - Instead, select *ping* targets sequentially from list
   - New members are inserted randomly in list
   - When list has been traversed, list is shuffled
-  - Sending *ping* messages is at most (2xn - 1, `n` is number of members) protocol periods apart
+  - Sending *ping* messages is at most (`2n - 1`, `n` is number of members) protocol periods apart
