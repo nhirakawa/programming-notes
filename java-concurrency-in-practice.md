@@ -39,3 +39,6 @@ public class NoVisibility {
 - Allows JVM to take advantage of modern multiprocessor hardware
 
 #### 3.1.1 Stale data
+- `NoVisibility` demonstrates stale data
+- Staleness is not all or nothing
+  - Variable by variable basis
