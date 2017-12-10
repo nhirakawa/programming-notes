@@ -115,7 +115,7 @@ while(!asleep) {
 - Publishing an object that should not have been is said to have _escaped_
 - Most blatant form of publication is storing a reference in a `public static` field
 
-##### Example
+##### Listing 3.5 Publishing an Object
 ```java
 public static Set<Secret> knownSecrets;
 
@@ -125,3 +125,127 @@ public void initialize() {
 ```
 
 - Any `Secret` added to the set is also published
+
+##### Listing 3.6 Allowing Internal Mutable State to Escape _Don't do this_
+```java
+class UnsafeStates {
+  private String[] states = new String[] {
+    "AK", "AL" ...
+  };
+  public String[] getStates() { return states; }
+}
+```
+
+- Publishing `states` is problematic because any caller can modify it
+- Any object that is _reachable_ from a published object through some chain of nonprivate field references or method calls is also published
+- From the perspective of a class `C`, an _alien_ method is one whose behavior is not fully specified by `C`.
+  - Includes methods in other classes and overrideable methods in `C`
+- Passing an object to an alient method is publishing
+  - Whether or not the alien method actually does publishing doesn't matter
+- Inner class instances can also publish
+
+##### Listing 3.7 Implicitly Allowing the `this` Reference to Escape. _Don't do this_
+```java
+public class ThisEscape {
+  public ThisEscape(EventSource source) {
+    source.registerListener(
+      new EventListener() {
+        public void onEvent(Event e) {
+          doSomething(e);
+        }
+     });
+  }
+}
+```
+
+- `ThisListener` publishes `EventListener`, and implicily publishes the enclosing instance
+
+#### 3.2.1 Safe Construction Practices
+- `ThisEscape` illustrates `this` reference escaping during construction
+- Publishing an object from within its constructor can publish an incompletely constructed object
+  - Even if publication is last statement in constructor
+- Oject is considered not property constructed
+- Common mistake is starting a thread in a constructor
+- Almost always shares `this` reference
+  - By passing it into constructor or `Thread`/`Runnable` is an inner class
+- Starting the thread from constructor, not simply creating, is the issue
+  - Expose a `start` or `initialize` method that starts the owned thread
+If tempted, avoid improper construction by using a private constructor and public factory method
+
+##### Listing 3.8 Using a Factory Method to Prevent the `this` reference from Escaping During Construction
+```java
+public class SafeListener {
+  private final EventListener listener;
+
+  private SafeListener() {
+    listener = new EventListener() {
+      public void onEvent(Event e) {
+        doSomething(e);
+      }
+    };
+  }
+
+  public static SafeListener newInstance(EventSource source) {
+    SafeListener safe = new SafeListener();
+    source.registerListener(safe.listener);
+    return safe;
+  }
+}
+```
+
+### 3.3 Thread Confinement 
+- Accessing shared, mutable data requires synchronization
+  - Or don't share
+- _Thread confinement_ is simplest way to achieve thread safety
+- JDBC uses thread confinement for `Connection` objects
+  - Calling thread acquires a connection from the pool, uses it, and returns it
+  - Pool will not dispense same connection to another thread until it has been returned
+- Not enforceable by Java language
+
+#### 3.3.1 Ad-hoc Thread Confinement
+- Responsibility for maintaining thread confinement depends on implementation
+- No language features assist
+- Often a consequence of implementing a particular subsystem as a single thread
+- Special case applies to `volatile` variables
+  - Modification on single thread, ensures other threads always read the most up-to-date value
+- Should be used sparingly
+
+#### 3.3.2 Stack Confinement
+- Special case of thread confinement
+- Only reached through local variables
+- Local variables intrinsically confined to executing thread
+  - Exist on executing thread's stack, which is not accessible to other threads
+- No way to obtain reference to primitive variables, so language semantics ensure that primitive local variables are always stack confined
+ 
+ ##### Listing 3.9 Thread Confinement of Local Primitive and Reference Variables
+ ```java
+public int loadTheArk(Collection<Animal> candidates) {
+  SortedSet<Animal> animals;
+  int numPairs = 0;
+  Animal canidate = null;
+
+  // animals confined to method, don't let them escape
+  animals = new TreeSet<Animal>(new SpeciesGenderComparator());
+  animals.addAll(candidates);
+  for(Animal a : animals) {
+    if(candidate == null || !candidate.isPotentialMate(a)) {
+      candidate = a;
+    } else {
+      ark.load(new AnimalPair(candidate, a));
+      ++numPairs;
+      candidate = null;
+    }
+  }
+
+  return numPairs;
+}
+ ```
+
+ - Maintaining stack confinement for object references requires programmer assistance
+ - Reference to `TreeSet<Animal>` is only reference, confined to executing thread
+  - Must not publish `animals` or they will escape
+- Using a thread-unsafe object in a within-thread context is thread-safe
+  - This knowledge only exists in the head of the developer
+  - If not clearly documented, object might escape in future development
+
+#### 3.3.3 ThreadLocal
