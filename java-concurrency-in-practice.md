@@ -88,6 +88,16 @@ public class SynchronizedInteger {
 - Behaves similar `SynchronizedInteger` (Listing 3.3), but no locking and executing thread does not block
 - Writing to a `volatile` variable is like a `synchronized` block
   - Affects other variables as well
+
+##### Listing 3.4 Counting Sheep
+```java
+volatile boolean asleep;
+
+while(!asleep) {
+  countSomeSheep();
+}
+```
+
 - Commonly used for completion/interruption/status flags
 - `volatile` is not strong enough to make incrememnt operation atomic unless only written from a single thread
 - Locking guarantees visibility and atomicity
