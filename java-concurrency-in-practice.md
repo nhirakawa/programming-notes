@@ -43,6 +43,28 @@ public class NoVisibility {
 - Staleness is not all or nothing
   - Variable by variable basis
 
+##### Listing 3.2 Non-thread-safe Mutable Integer Holder
+  ```java
+  @NonThreadSafe
+  public class MutableInteger {
+    private int value;
+
+    public int get() { return value; }
+    public void set(int value) { this.value = value; }
+  }
+  ```
+
+  ##### Listing 3.3 Thread-safe Mutable Integer Holder
+  ```java
+@ThreadSafe
+public class SynchronizedInteger {
+  @GuardedBy("this") private int value;
+
+  public synchronized int get() { return value; }
+  public synchronized void set(int value) { this.value = value; }
+}
+  ```
+
 #### 3.1.2 Nonatomic 64-bit operations
 - Sales values were at some point valid
   - Not some random value
@@ -63,7 +85,7 @@ public class NoVisibility {
 - Ensures updates to a variable are propagated predictably to other threads
 - Compiler and runtime know that the variable is shared and memory operations should not be reordered.
 - Not cached in registers or caches that are hidden from other processors
-- Behaves similar `SynchronizedInteger`, but no locking and executing thread does not block
+- Behaves similar `SynchronizedInteger` (Listing 3.3), but no locking and executing thread does not block
 - Writing to a `volatile` variable is like a `synchronized` block
   - Affects other variables as well
 - Commonly used for completion/interruption/status flags
