@@ -3223,3 +3223,28 @@ public class IndexerThread extends Thread {
 
 ## Chapter 16. The Java Memory Model
   - Guarded - Access only with specific lock. Include objects encapsulated in other thread-safe objects and published objects that are guarded by specific lock
+  ## Chapter 4. Composing Objects
+
+  ## Chapter 5. Building Blocks
+
+  ## Chapter 6. Task Execution
+
+  ## Chapter 7. Cancellation and Shutdown
+
+  ## Chapter 8. Applying Thread Pools
+
+  ## Chapter 9. GUI Applications
+
+  ## Chapter 10. Avoiding Liveness Hazards
+
+  ## Chapter 11. Performance and Scalability
+
+  ## Chapter 12. Testing Concurrent Programs
+
+  ## Chapter 13. Explicit Locks
+
+  ## Chapter 14. Building Custom Synchronizers
+
+  ## Chapter 15. Atomic Variables and Nonblocking Synchronization
+
+  ## Chapter 16. The Java Memory Model
