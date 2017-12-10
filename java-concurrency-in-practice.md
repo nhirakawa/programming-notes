@@ -8,7 +8,7 @@
 - For single-threaded environments, if you write a value and read then you get the same value
   - Not necessarily true for multiple threads
   - Generally no guarantee that a read will be eventually consistent
-#### Example
+##### Example
 ```java
 public class NoVisibility {
 
