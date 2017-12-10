@@ -1,4 +1,5 @@
 # Java Concurrency in Practice
+## Chapter 2. Thread Safety
 ## Chapter 3. Sharing Objects
 - This chapter is about objects that can be safely accessed by multiple threads
 - `synchronized` is not just about atomicity or demarcating "critical sections"
@@ -482,3 +483,29 @@ public class Holder {
   - Shared read-only - Access concurrently by multiple threads without synchronization, but cannot be modified by any thread. Include immutable and effectively immutable objects
   - Shared thread-safe - Performs synchronization internally, other threads need no futher synchronization
   - Guarded - Access only with specific lock. Include objects encapsulated in other thread-safe objects and published objects that are guarded by specific lock
+
+  ## Chapter 4. Composing Objects
+
+  ## Chapter 5. Building Blocks
+
+  ## Chapter 6. Task Execution
+
+  ## Chapter 7. Cancellation and Shutdown
+
+  ## Chapter 8. Applying Thread Pools
+
+  ## Chapter 9. GUI Applications
+
+  ## Chapter 10. Avoiding Liveness Hazards
+
+  ## Chapter 11. Performance and Scalability
+
+  ## Chapter 12. Testing Concurrent Programs
+
+  ## Chapter 13. Explicit Locks
+
+  ## Chapter 14. Building Custom Synchronizers
+
+  ## Chapter 15. Atomic Variables and Nonblocking Synchronization
+
+  ## Chapter 16. The Java Memory Model
