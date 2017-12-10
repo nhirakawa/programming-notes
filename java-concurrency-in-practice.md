@@ -3222,3 +3222,4 @@ public class IndexerThread extends Thread {
 ## Chapter 15. Atomic Variables and Nonblocking Synchronization
 
 ## Chapter 16. The Java Memory Model
+  - Guarded - Access only with specific lock. Include objects encapsulated in other thread-safe objects and published objects that are guarded by specific lock
