@@ -949,7 +949,7 @@ public class BetterVector<E> extends Vector<E> {
 - Third strategy is to extend the functionality without extending the class
   - Helper class
 
-##### Listing 4.14. Non-thread-safe Attempt to Omplement a put-if-absent. _Don't do this_
+##### Listing 4.14. Non-thread-safe Attempt to Implement a put-if-absent. _Don't do this_
 ```java
 @NotThreadSafe
 public class ListHelper<E> {
@@ -968,7 +968,7 @@ public class ListHelper<E> {
 - No guarantee another thread won't modify the list while `putIfAbsent` is executing
 - `Vector` documentation uses intrinsic lock
 
-##### Listing 4.15. Implementing put-if-absent with client-side locking
+##### Listing 4.15. Implementing put-if-absent with Client-Side Locking
 ```java
 @ThreadSafe
 public class ListHelper<E> {
@@ -992,7 +992,7 @@ public class ListHelper<E> {
 #### 4.4.2. Composition
 - Less fragile alternative
 
-##### Listing 4.16. Implementing put-if-absent using composition
+##### Listing 4.16. Implementing put-if-absent Using Composition
 ```java
 @ThreadSafe
 public class ImprovedList<T> implements List<T> {
@@ -1037,6 +1037,737 @@ public class ImprovedList<T> implements List<T> {
   - Implementations should expect to need to deal with concurrent access
 
 ## Chapter 5. Building Blocks
+
+### 5.1. Synchronized Collections
+- Include `Vector` and `Hashtable`
+  - Along with `Collections.synchronizedXxx` factory methods
+
+#### 5.1.1. Problems with Synchronized Collections
+- Thread-safe but may need additional locking for compound actions
+  - Iteration, navigation, conditional operation (put-if-absent)
+- Technically thread-safe, but may not behave as expected under concurrent access
+
+##### Listing 5.1. Compound Actions on a `Vector` that may produce confusing results
+```java
+public static Object getLast(Vector list) {
+  int lastIndex = list.size() - 1;
+  return list.get(lastIndex);
+}
+
+public static void deleteLast(Vector list) {
+  int lastIndex = list.size() - 1;
+  list.remove(lastIndex);
+}
+```
+- Operations can be interleaved
+- Synchronized collections use implementation that allows client-side locking
+  - Possible to create new operations that are atomic
+  - Can acquire lock on synchronized collection object
+- Size of list and corresponding get also affects iteration
+
+##### Listing 5.2. Compound actions on `Vector` using client-side locking
+```java
+public static Object getLast(Vector list) {
+  synchronized (list) {
+    int lastIndex = list.size() - 1;
+    return list.get(lastIndex);
+  }
+}
+
+public static void deleteLast(Vector list) {
+  synchronized(list) {
+    int lastIndex = list.size() - 1;
+    list.remove(lastIndex);
+  }
+}
+```
+
+##### Listing 5.3. Iteration that may throw `ArrayIndexOutOfBoundsException`
+```java
+for (int i = 0; i < vector.size(); i++) {
+  doSomething(vector.get(i));
+}
+```
+
+#### 5.1.2. Iterators and `ConcurrentModificationException`
+- Standard way of iterating through a `Collection` is `Iterator`
+  - Explicitly or with `for-each` loop
+- Iterators returned by synchronized collections not designed to deal with concurrent modification
+  - Fail-fast if collection has changed since iteration began
+  - Throw unchecked `ConcurrentModificationException`
+- Designed to catch errors on "good-faith-effort"
+- Implemented by associating modification count with collection
+  - If modification count changes during iteration, `hasNext` or `next` throws `ConcurrentModificationException`
+  - Done without synchronization
+
+##### Listing 5.5. Iterating a `List` with an `Iterator`
+```java
+List<Widget> widgetList = collections.synchronizedList(new ArrayList<>());
+// May throw ConcurrentModificationException
+for (Widget w : widgetList) {
+  doSomething(w);
+}
+```
+
+- Locking collection during iteration may be undesirable
+- Other threads will block on access
+  - Might wait a long time
+- Risk factor for dead lock
+- Even if it works, hurts application scalability
+  - Lock contention leads to lower throughput and CPU utilization
+- Alternative is to clone collection and iterate the copy
+  - Thread-confined
+  - Eliminates possibility of `ConcurrentModificationException`
+  - Original collection must still be locked for clone
+- Cloning still has performance cost
+
+#### 5.1.3. Hidden Iterators
+- Have to remember to use locking everywhere a shared collection might be iterated
+
+#####  Listing 5.6. Iteration hidden within string concatenation. _Don't do this_
+```java
+public class HiddenIterator {
+  @GuardedBy("this")
+  private final Set<Integef> set = new HashSet<>();
+
+  public synchronized void add(Integer i) {
+    set.add(i);
+  }
+
+  public synchronized void remove(Integer i) {
+    set.remove(i);
+  }
+
+  public void addTenThings() {
+    Random r = new Random();
+    for (int i = 0; i < 10; i++) {
+      add(r.nextInt());
+    }
+    System.out.println("DEBUG: added ten elements to " + set);
+  }
+}
+```
+
+- String concatenation turns into `StringBuilder.append(Object)`, which invokes collection's `toString`, which iterates the collection and calls `toString` on each element
+- The greater the distance between state and synchronization, the more likely someone will forget to use proper synchronization
+- Iteration also invoked by collection's `hashCode` and `equals` methods
+  - `containsAll`, `removeAll`, and `retainAll` methods will iterate over collection parameter
+
+### 5.2 Concurrent Collections
+- Java 5 provides several concurrent collection classes
+- Synchronized collections serialize all access
+  - Poor concurrency
+- Also addes `Queue` and `BlockingQueue`
+  - `ConcurrentLinkedQueue` and `PriorityQueue`
+- Java 6 adds `ConcurrentSkipListMap` and `ConcurrentSkiplistSet`
+  - Replace synchronized `SortedMap` and `SortedSet`
+
+#### 5.2.1. ConcurrentHashMap
+- Synchronized collections hold lock for duration of operation
+  - Iterating collection might be necessary for some calls
+- `ConcurrentHashMap` uses a more performant locking strategy
+  - Lock striping
+  - Arbitrary number of reading threads
+  - Reads don't compete with writes
+  - Limited number of writers
+  - Higher throughput for concurrent access, little performance penalty for single-threaded access
+- Concurrent collections provide iterators that do not throw `ConcurrentModificationException`
+- Iterators are weakly-consistent
+  - Tolerant of concurrent modification
+  - Traverses elements as existed when iterator was constructed
+  - May (but not guaranteed) relfect modifications after construction of iterator
+- Semantics of methods that operate on entire map (`size`, `isEmpty`) are slightly weakened
+  - Could be out of date
+  - Generally not useful in concurrent environments, so weakness is tolerable
+- Synchronized collections allow exclusive access
+  - Only real tradeoff
+
+#### 5.2.2. Additional Atomic Map Operations
+- `ConcurrentMap` offers put-if-absent, remove-if-equal, and replace-if-equal atomic eoperations
+
+##### Listing 5.7. `ConcurrentMap` interface
+```java
+public interface ConcurrentMap<K, V> extends Map<K, V> {
+  // Insert into map only if no value is mapped from K
+  V putIfAbsent(K key, V value);
+
+  // Remove only if K is mapped to V
+  boolean remove(K key, V value);
+
+  // Replace value only if K is mapped to some value
+  V replace(K key, V newValue);
+}
+```
+
+#### 5.2.3. CopyOnWriteArrayList
+- Concurrent replacement for synchronized `List`
+- Rely on properly publishing immutable objects
+- Create and republish new copy of collection every time it is modified
+- Iterators retain reference to backing array from start of iteration
+  - Only need to synchronize briefly to ensure visibility of array contents
+- Some cose to copying the backing array
+  - Reasonable only when iteration is far more common than modification
+  - E.g. event-notification systems
+
+### 5.3. Blocking Queues and the Producer-Consumer Pattern
+- Blocking queues provide blocking `put` and `take` methods
+  - Also timed `offer` and `put`
+- If queue is full/empty, thread will block until condition is met
+- Can be bounded or unbounded
+- Support producer-consumer pattern
+  - Separates the identification of work with execution of work
+  - Producers place data in queue as it's available
+  - Consumers take data when they are ready
+- Producers/consumers don't need to know about the other
+- Blocking queue simplifies consumers
+  - `take` blocks until data is available
+  - If producers aren't fast enough, consumers will wait
+- If produers generate work faster than consumption, will run out of memory
+  - Bounded queue will cause producer to block
+- `offer` will return a failure status if item cannot be enqueued
+  - Can use alternate strategy (shedding load, write to disk, scale down, throttling)
+
+#### 5.3.1. Example: Desktop Search
+- Producer task searches for files meeting index criteria, consumer task takes file names and indexes them
+
+##### Listing 5.7. Producer and Consumer Tasks in a Desktop Search Application
+```java
+public class FileCrawler implements Runnable {
+  private final BlockingQueue<File> fileQueue;
+  private final FileFilter fileFilter;
+  private final File root;
+
+  public void run() {
+    try {
+      crawl(root);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+  }
+
+  private void crawl(File root) throws InterruptedException {
+    File[] entries = root.listFiles(fileFilter);
+    if (entries != null) {
+      for (File entry : entries) {
+        if (entry.isDirectory()) {
+          crawl(entry);
+        } else if(!alreadyIndexed(entry)) {
+          fileQueue.put(entry);
+        }
+      }
+    }
+  }
+}
+
+public class Indexer implements Runnable {
+  private final BlockingQueue<File> queue;
+
+  public Indexer(BlockingQueue<File> queue) {
+    this.queue = queue;
+  }
+
+  public void run() {
+    try {
+      while (true) {
+        indexFile(queue.take());
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+    }
+  }
+}
+```
+
+##### Listing 5.9. Starting the Desktop Search
+```java
+public static void startIndexing(File[] roots) {
+  BlockingQueue<File> queue = new LinkedBlockingQueue<File>(BOUND);
+  FileFilter filter = new FileFilter() {
+    public boolean accept(File file) { return true; }
+  }
+
+  for (File root : roots) {
+    new Thread(new FileCrawler(queue, filter, root)).start();
+  }
+
+  for(int i = 0; i < N_CONSUMERS; i++) {
+    new Thread(new Indexer(queue)).start();
+  }
+}
+```
+
+#### 5.3.2. Serial Thread Confinement
+- Blocking queue implementations contain sufficient internal synchronization to safely publish objects from producer thread to consumer thread
+- For mutable objects, facilitate serial thread confinement
+  - Owned exclusively by thread, but ownership can be transferred by publishing it
+- Object pools lend object to requesting thread
+  - As long as pooled object is safely published and clients do not published pooled object or use it after returning, ownership is safely transferred
+- Could use other publication methods but necessary to ensure only one thread receives it
+
+#### 5.3.3. Deques and Work Stealing
+- Java 6 also adds `Deque` ("deck") and `BlockingDeque`
+  - Double-ended queue
+- Useful for work stealing
+- If consumer exhausts own deque, it steals work from tail of another deque
+- Workers don't contend for a shared queue
+  - When accessing other deques, read from tail instead of head further reduces contention
+
+### 5.4. Blocking and Interruptible Methods
+- Threads may block
+  - I/O, lock, wake up from `Thread.sleep`, computation on another thread
+- Usually suspended and placed in a blocked thread state
+  - `BLOCKED`, `WAITING`, `TIMED_WAITING`
+- Blocked thread must wait for an evant beyond its control
+  - Then placed in `RUNNABLE` state and is eligible for scheduling
+- `put` and `take` throw `InterruptedException`
+  - Signals that it blocks, and that if interrupted it will make an effort to stop blocking early
+- `Thread` provides `interrupt` for interrupting a thread and querying whether a thread has been interrupted
+  - Boolean property that represents interrupted status
+- Interruption is cooperative
+  - When thread A interrupts thread B, it only requests that B stops when it is convenient
+- When handling `InterruptedException`, there are basically 2 choices
+  - Propagate the exception
+  - Restore the interrupt
+    - Must catch exception and call `interrupt` on current thread
+    - Code higher in the call stack will see that an interrupt was issued
+
+##### Listing 5.10. Restoring the Interrupted Status so as Not to Swallow the Interrupt
+```java
+public class TaskRunnable implements Runnable {
+  BlockingQueue<Task> queue;
+
+  public void run() {
+    try {
+      processTask(queue.take());
+    } catch (InterruptedException e) {
+      // restore interrupted status
+      Thread.currentThread().interrupt();
+    }
+  }
+}
+```
+
+- Should not swallow `InterruptedException`
+  - Code higher in the call stack cannot respond to interruption
+  - Only acceptable when extending Thread and control all code higher in the call stack
+
+### 5.5. Synchronizers
+- Blocking queues act as containers, and coordinate flow of producer and consumer threads
+- Synchronizer is object that coordinates flow of threads based on its state
+  - e.g. blocking queues, semaphores, barriers, latches
+- Encapsulate state that determines whether threads should pass or wait
+- Provide methods to manipulate state
+- Provide methods to wait efficiently for synchronizer to enter desired state
+
+#### 5.5.1. Latches
+- Delays progress of threads until it reaches terminal state, like a gate
+- Until latch reaches terminal state, gate is closed and no thread passes
+- In terminal state, latch opens and all threads pass
+- Once latch reaches terminal state, it cannot change state
+  - Remains open forever
+- Useful for one-time activities
+  - Resource initialization
+  - Dependent services
+  - Waiting until all parties in activity are ready
+- `CountDownLatch` allows one or more threads to wait for a set of events to occur
+  - Latch state is a positive counter
+  - `countDown` decrements counter, indicates method occurred
+  - `await` waits for counter to reach 0
+
+##### Listing 5.11. Using `CountDownLatch` for Starting and Stopping Threads in Timing Tests
+```java
+public long timeTasks(int nThreads, final Runnable task) throws InterruptedException {
+  final CountDownLatch startGate = new CountDownLatch(1);
+  final CountDownLatch endGate = new CountDownLatch(nThreads);
+
+  for (int i  = 0; i < nThreads; i++) {
+    Thread t = new Thread() {
+      public void run() {
+        try {
+          startGate.await();
+          try {
+            task.run();
+          } finally {
+            endGate.countDown();
+          }
+        } catch (InterruptedException ignored) {}
+      }
+    };
+    t.start();
+  }
+
+  long start = System.nanoTime();
+  startGate.countDown();
+  endGate.await();
+  long end = System.nanoTime();
+  return end-start;
+}
+```
+
+- `TestHarness` creates threads to run concurrently
+- Uses a starting gate and an ending gate
+- Each thread waits on starting gate, then counts down end gate
+- Master thread wiats until last worker has finished, so it can calculate elapsed time
+
+#### 5.5.2. FutureTask
+- Acts like a latch
+- Implemented with a `Callable`
+  - 3 states: waiting to run, running, completed
+- When `FutureTask` enters completed state, stays that way forever
+- `Future.get` dpends on state of task
+  - If completed, returns result immediately
+  - Otherwise blocks until task transitions to completed and returns result or throws exception
+- Conveys result from thread executing to thread retrieving result
+  - Guarantees that transfer is a safe publication
+- Used by `Executor` to represent asynchronus tasks
+- Can be used to represent lengthy computation that is started before results are needed
+
+##### Listing 5.12. Using `FutureTask` to Preload Data that is Needed Later
+```java
+public class Preloader {
+  private final FutureTask<ProductInfo> future = new FutureTask<ProductInfo>(new Callables<ProductInfo>() {
+    public ProductInfo call() throws DataLoadException {
+      return loadProductInfo();
+    }
+  });
+}
+private final Thread thread = new Thread(future);
+
+public void start() { thread.start(); }
+
+public ProductInfo get() throws DataLoadException, InterruptedException {
+  try {
+    return future.get();
+  } catch (ExecutionException e) {
+    Throwable cause = e.getCause();
+    if (cause instanceof DataLoadException) {
+      throw (DataLoadException) cause;
+    } else {
+      throw launderThrowable(cause);
+    }
+  }
+}
+```
+
+- `Preloader` creates a `FutureTask` that loads product information from database
+- Provides `start` method to start thread
+  - Starting thread from constructor is indavisable
+- `Callable` can throw checked and unchecked exceptions
+  - Wrapped in `ExecutionException` and rethrown from `Future.get`
+- Call site must deal with `ExecutionException`, and type is `Throwable`
+- One of three categories
+  - Checked exception thrown from `Callable`
+  - `RuntimeException`
+  - `Error`
+- `launderThrowable` hanldes messy exception handling
+- Test for known checked exceptions before dealing with others
+  - Rethrow `Error` as-is
+  - Return `RuntimeException`, which is generally rethrown
+  - Throw `IllegalStateException` for non-`RuntimeException`s
+
+##### Listing 5.13. Coercing an Unchecked `Throwable` to a `RuntimeException`
+```java
+public static RuntimeException launderThrowable(Throwable t) {
+  if (t instanceof RuntimeException) {
+    return (RuntimeException) t;
+  } else if (t instanceof Error) {
+    throw (Error) t;
+  } else {
+    throw new IllegalStateException("Not unchecked", t);
+  }
+}
+```
+
+#### 5.5.2. Semaphores
+- Counting semaphores control number of activities that access resource or perform action at the same time
+- Can be used to implement resource pools or impose bound
+- `Semaphore` manages set of permits
+  - Initial number is passed to constructor
+- Activities acquire permits (if there are any available) and release them
+  -  `acquire` blocks until a permit is available, or until interrupted, or until operation times out
+  - `release` returns permit
+- Degenerate case of binary semaphore
+  - Can be used as a mutex
+- Useful for resource pools
+  - e.g. database connection pools
+- Can also use to turn any collection into a bounded blocking collection
+
+##### Listing 5.14. Using `Semaphore` to Bound a Collection
+```java
+public class BoundedHashSet<T> {
+  private final Set<T> set;
+  private final Semaphore sem;
+
+  public BoundedHashSet(int bound) {
+    this.set = Collections.synchronizedSet(new HashSet<>());
+    sem = new Semaphore(bound);
+  }
+
+  public boolean add(T o) throws InterruptedException {
+    sem.acquire();
+    boolean wasAdded = false;
+    try {
+      wasAdded = set.add(o);
+      return wasAdded;
+    } finally {
+      if(!wasAdded) {
+        sem.release();
+      }
+    }
+  }
+
+  public boolean remove(Object o) {
+    boolean wasRemoved = set.remove(o);
+    if (wasRemoved) {
+      sem.release();
+    }
+    return wasRemoved;
+  }
+}
+```
+
+#### 5.5.4. Barriers
+- Latches are single-use
+- Barriers are similar to latches
+  - Block a group of threads until some event has occurred
+- All threads must come together at the same time
+- Latches are for waiting for an event, barriers are for waiting for threads
+- `CyclicBarrier` allows fixed number of parties to rendevous repeatedly
+  - Useful in parallel iterative algorithms that break down subproblems
+- Threads call `await` and block until all threads have reached the barrier
+- If `await` times out or a thread is interrupted, barrier is broken
+  - All outstanding calls terminate with `BrokenBarrierException`
+- If `await` is successful, returns a unique arrival index for each thread
+  - Can be used to elect leader
+- Can pass `Runnable` to barrier constructor
+  - Runs when barrier is successfully passed, but before blocked threads are released
+- Useful for simulations
+  - Each step must complete before next step begins
+
+##### Listing 5.15. Coordinating Computation in a Cellular Automaton with `CyclicBarrier`
+```java
+public class CellularAutomata {
+  private final Board mainBoard;
+  private final CyclicBarrier barrier;
+  private final Worker[] workers;
+
+  public CellularAutomata(Board board) {
+    this.mainBoard = board;
+    int count = Runtime.getRuntime().availableProcessors();
+    this.barrier = new CyclicBarrier(
+      count,
+      new Runnable() {
+        public void run() {
+          mainBoard.commitNewValues();
+        }
+      }
+    );
+    this.workers = new Worker[count];
+    for (int i = 0; i < count; i++) {
+      workers[i] = new Worker(mainBoard.getSubBoard(count, i));
+    }
+  }
+
+  private class Worker implements Runnable {
+    private final Board board;
+
+    public Worker(Board board) { this.board = board; }
+    public void run() {
+      while(!board.hasConverged()) {
+        for (int x = 0; x < board.getMaxX(); x++) {
+          for (int y = 0; y < board.getMaxY(); y++) {
+            board.setNewValue(x, y, computeValue(x, y));
+          }
+        }
+        try {
+          barrier.await();
+        } catch (InterruptedException ex) {
+          return;
+        } catch (BrokenBarrierException ex) {
+          return;
+        }
+      }
+    }
+  }
+
+  public void start() {
+    for (int i = 0; i < workers.length; i++) {
+      new Thread(workers[i]).start();
+    }
+    mainBoard.waitForConvergence();
+  }
+}
+```
+
+- `Exchanger` is a two-party barrier
+  - Useful when performing asymetric activities
+  - e.g. one thread fills buffer, other thread consumes data from buffer
+- Exchange constitues safe publication of both objects to other party
+- Timing of exchange depends on responsiveness requirements
+  - Exchange when buffer is full and when buffer is empty
+  - Exchange when buffer is full, or certain amount of time has elapsed
+
+### 5.6. Building an Efficient, Scalable Result Cache
+- Naive cache implementation turns performance bottleneck into scalability bottleneck
+
+##### Listing 5.16. Initial Cache Attempt using `HashMap` and Synchronization
+```java
+public interface Computable<A, V> {
+  V compute(A arg) throws InterruptedException;
+}
+
+public class ExpensiveFunction implements Computable<String, BigInteger> {
+  public BigInteger compute(String arg) {
+    // after deep though
+    return new BigInteger(arg);
+  }
+}
+
+public class Memoizer1<A, V> implements Computable<A, V> {
+  @GuardedBy("this")
+  private final Map<A, V> cache = new HashMap<>();
+  private final Computable<A, V> c;
+
+  public Memoizer1(Computable<A, V> c) {
+    this.c = c;
+  }
+
+  public synchronized V compute(A arg) throws InterruptedException {
+    V result = cache.get(arg);
+    if (result == null) {
+      result = c.compute(arg);
+      cache.put(arg, result);
+    }
+    return result;
+  }
+}
+```
+
+- `Memoizer1` uses `HashMap` to store previous results
+  - Returns result if cached, otherwise computes, stores, and returns
+  - `HashMap` is not thread safe, so takes conservative approach of using `synchronized`
+
+##### Listing 5.17. Replacing `HashMap` with `ConcurrentHashMap`
+```java
+public class Memoizer2<A, V> implements Computable<A, V> {
+  private final Map<A, V> cache = new ConcurrentHashMap<>();
+  private final Computable<A, V> c;
+
+  public Memoizer2(Computable<A, V> c){ this.c = c; }
+
+  public V compute(A arg) throws InterruptedException {
+    V result = cache.get(arg);
+    if (result == null) {
+      result - c.compute(arg);
+      cache.put(arg, result);
+    }
+    return result;
+  }
+}
+```
+
+- Multiple threads can use `Memoizer2` concurrently
+  - Still possible for 2 threads to compute same value at same time
+  - For memoization, just slow
+  - More generally, safety risk
+- Other threads not aware that another thread has already started computation
+  - `FutureTask` does exactly this
+
+##### Listing 5.18. Memoizing Wrapper using `FutureTask`
+```java
+public class Memoizer3<A, V> implements Computable<A, V> {
+  private final Map<A, Future<V>> cache = new ConcurrentHashMap<A, Future<V>>();
+  private final Computable<A, V> c;
+
+  public Memoizer3(Computable<A, V> c) { this.c = c; }
+
+  public V compute(final A arg) throws InterruptedException {
+    Future<V> f = cache.get(arg);
+    if (f == null) {
+      Callable<V> eval = new Callable<>() {
+        public V call() throws InterruptedException {
+          return c.compute(arg);
+        }
+      };
+      FutureTask<V> ft = new FutureTask<>(eval);
+      f = ft;
+      cache.put(arg, ft);
+      ft.run();
+    }
+    try {
+      return f.get();
+    } catch (ExecutionException e) {
+      throw launderThrowable(e.getCause());
+    }
+  }
+}
+```
+
+- Good concurrency, result returned efficiently if already computed, and threads wait if computation is already running
+- Still a small window when threads might compute same value
+  - Need an atomic put-if-absent
+- Caching `Future` means cache might be polluted
+  - e.g. `Future` is cancelled or fails
+  - Should remove cancelled futures (possible failed futures if future attempts would succeed)
+
+##### Listing 5.19. Final Implementation of `Memoizer`
+```java
+public class Memoizer<A, V> implements Computable<A, V> {
+  private final ConcurrentMap<A, Future<V>> cache = new ConcurrentHashMap<>();
+  private final Computable<A, V> c;
+
+  public Memoier (Computable<A, V> c) { this.c = c; }
+
+  public V compute(final A arg) throws InterruptedException {
+    while (true) {
+      Future<V> f = cache.get(arg);
+      if (f == null) {
+        Callable<V> eval = new Callable<V>() {
+          public V call() throws InterruptedException {
+            return c.compute(arg);
+          }
+        };
+        FutureTask<V> ft = new FutureTask<>(eval);
+        f = cache.putIfAbsent(arg, ft);
+        if (f == null) {
+          f = ft;
+          ft.run();
+        }
+        try {
+          return f.get();
+        } catch (CancellationException e) {
+          cache.remove(arg, f);
+        } catch (ExecutionException e) {
+          throw launderThrowable(e.getCause());
+        }
+      }
+    }
+  }
+}
+```
+
+##### Listing 5.20. Factorizing Servlet that Caches Results Using `Memoizer`
+```java
+@ThreadSafe
+public class Factorizer implements Servlet {
+  private final Computable<BigInteger, BigInteger[]> c = new Computable<>() {
+    public BigInteger[] compute(BigInteger arg) {
+      return factor(arg);
+    }
+  };
+  private final Computable<BigInteger, BigInteger[]> cache = new Memoizer<>(c);
+
+  public void service(ServletRequest req,
+                      ServletResponse resp) {
+    try {
+      BigInteger i = extractFromRequest(req);
+      encodeIntoResponse(resp, cache.compute(i));
+    } catch (InterruptedException e) {
+      encodeError(resp, "factorization interrupted");
+    }
+  }
+}
+```
 
 ## Chapter 6. Task Execution
 
