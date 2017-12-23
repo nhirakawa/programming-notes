@@ -183,13 +183,14 @@ interface EldestEntryRemovalFunction<K,V> {
 - 43 interfaces in `java.util.Function`
   - 6 basic interfaces
 
-| Type              | Example                  | Lambda Equivalent                                    |
-|-------------------|--------------------------|------------------------------------------------------|
-| Static            | `Integer::parseInt`      | `str -> Integer.parseInt(str)`                       |
-| Bound             | `Instant.now()::isAfter` | `Instant then = Instant.now(); t -> then.isAfter(t)` |
-| Unbound           | `String::toLowerCase`    | `str -> str.toLowerCase()`                           |
-| Class Constructor | `TreeMap<K,V>::new`      | `() -> new TreeMap`                                  |
-| Array Constructor | `int[]::new`             | `len -> new int[len]`                                |
+| Interface         | Function Signature  | Example               |
+|-------------------|---------------------|-----------------------|
+| UnaryOperator<T>  | T apply(T t)        | `String::toLowerCase` |
+| BinaryOperator<T> | T apply(T t1, T t2) | `BigInteger::add`     |
+| Predicate<T>      | boolean test(T t)   | `Collection::isEmpty` |
+| Function<T,R>     | R apply(T t)        | `Arrays::asList`      |
+| Supplier<T>       | T get()             | `Instant::now`        |
+| Consumer<T>       | void accept(T t)    | `System.out::println` |
 
 - Also flavors for `int`, `long`, and `double`
 
