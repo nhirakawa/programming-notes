@@ -5061,6 +5061,46 @@ public List<TravelQuote> getRankedTravelQuotes(TravelInfo travelInfo,
 
 ## Chapter 7. Cancellation and Shutdown
 
+### 7.1. Task Cancellation
+
+#### 7.1.1. Interruption
+
+#### 7.1.2. Interruption Policies
+
+#### 7.1.3. Responding to Interruption
+
+#### 7.1.4. Example: Timed Run
+
+#### 7.1.5. Cancellation Via `Future`
+
+#### 7.1.6. Dealing with Non-interruptible Blocking
+
+#### 7.1.7. Encapsulating Nonstandard Cancellation with `newTaskFor`
+
+### 7.2. Stopping a Thread-Based Service
+
+#### 7.2.1. Example: A Logging Service
+
+#### 7.2.2. `ExecutorService` Shutdown
+
+#### 7.2.3. Poison Pills
+
+#### 7.2.4. Example: A One-shot Execution Service
+
+#### 7.2.5. Limitations of `shutdownNow`
+
+### 7.3. Handling Abnormal Thread Termination
+
+#### 7.3.1. Uncaught Exception Handlers
+
+### 7.4. JVM Shutdown
+
+#### 7.4.1. Shutdown Hooks
+
+#### 7.4.2. Daemon Threads
+
+#### 7.4.3. Finalizers
+
 ## Chapter 8. Applying Thread Pools
 
 ## Chapter 9. GUI Applications
