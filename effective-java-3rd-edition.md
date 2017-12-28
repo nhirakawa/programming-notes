@@ -193,8 +193,68 @@ interface EldestEntryRemovalFunction<K,V> {
 | Consumer<T>       | void accept(T t)    | `System.out::println` |
 
 - Also flavors for `int`, `long`, and `double`
+- **Don't be tempted to use basic interfaces with boxed primitives instead of primitive functional interfaces**
+- When should you write your own functional interface?
+  - When a standard interface won't work
+    - 3 paramters
+    - Throw a checked exception
+- Consider `Comparator<T>`
+  - Identical to `ToIntBiFunction<T, T>`
+  - Name provides better documentation
+  - Strong requirements on what constitutes a valid instance
+  - Heavily outfitted with useful default methods
+- Consider a purpose-built functional interface when
+  - Commonly used and benefits from descriptive name
+  - Has strong contract
+  - Benefits from custom default methods
+- `@FunctionalInterface` has 3 benefits
+  - Documentation
+  - Compilation will fail unless there is exactly 1 abstract method
+  - Prevents adding abstract methods
+- **Always annotate your functional interfaces with the `@FunctionalInterface` annotation**
+- Must be careful to not take different functional interfaces in same argument position
+  - Could create ambiguity
+  - Not a theoretical problem (`ExecutorService#submit`)
 
 ### Item 45: Use Streams Judiciously
+- Streams added for bulk operations
+- Evaluated lazily
+  - Stream wihtout terminal step is never evaluated
+- API is fluent
+  - Multiple calls are chained in single expression
+- By default, run sequentially
+  - Usually not appropriate to use `parallel`
+- Streams aren't always helpful/clearer
+- **Overusing streams makes programs hard to read and maintain**
+- **In the absence of explicit types, careful naming of lambda parameters is essential to the readability of stream pipelines**
+- **Using helper methods is even more important for readability in stream pipelines than in iterative code**
+- **Refrain from using streams to process `char` values**
+- **Refactor existing code to use streams and use them in new code only where it makes sense to do so**
+- Some tasks more suited to code block than function objects
+  - Read/modify local variables (lambdas can only read final/effectively final variables)
+  - Can `return`, `break`, or `continue`, or throw any checked declared exception
+- Streams make it easy to
+  - Transform sequence of elements
+  - Filter sequence of elements
+  - Combine sequences in a single operation
+  - Accumulate sequences of elements into a collection
+  - Search a sequence for an element satisfying a condition
+- Streams do not have access to previous information
+  - Could group into pair objects, but becomes cumbersome if needed for many stages in pipeline
+- **If you're not sure whether a task is better served by streams or iteration, try both and see which works better**
+
 ### Item 46: Prefer Side-Effect-Free Functions in Streams
+- **The `forEach` operation should be used only to report the result of a stream computation, not to perform the computation**
+- **It is customary and wise to statically import all members of `Collectors` because it makes stream pipelines more readable**
+- **There is never a reason to say `collect(counting())`**
+
 ### Item 47: Prefer Collection to Stream as a Return Type
+- **`Collection` or an appropriate subtype is generally the best return type for a public, sequence-returning method**
+- **Do not store a large sequence in memory just to return it as a collection**
+
 ### Item 48: Use Caution When Making Streams Parallel
+- **Parallelizing a pipeline is unlikely to increase its performance if the source is from `Stream.iterate` or the intermediate operation `limit` is used**
+- **Do not parallelize stream pipelines indiscriminately**
+- **Performance gains from parallelism are best on streams over `ArrayList`, `HashSet`, and `ConcurrentHashMap` instances; arrays; and `int` and `long` ranges**
+- **Not only can parallelizing a stream lead to poor performance, including liveness failures; it can lead to incorrect results and unpredictable behavior**
+- **Under the right circumstances, it is possible to achieve near-linear speedup in the number of processor cores simply by adding a `parallel` call to a stream pipeline**
