@@ -5060,14 +5060,246 @@ public List<TravelQuote> getRankedTravelQuotes(TravelInfo travelInfo,
   - On return, each task will be completed or cancelled
 
 ## Chapter 7. Cancellation and Shutdown
+- Sometimes want to stop tasks or threads early
+  - Cancel operation or application needs to shutdown
+- Java has no way to force-stop a thread
+  - Interruption is cooperative
+- Rarely want immediate stop
+  - Could leave shared data structures in inconsistent state
+- Instead clean up any in-progress work then terminate
 
 ### 7.1. Task Cancellation
+- Activity is cancellable if external code can move it to completion earlier than normal
+- Several reasons why
+  - User-requested cancellation
+  - Time-limited activities
+  - Application events
+  - Errors
+  - Shutdown
+- One cooperative mechanism is setting flag
+  - If flag is set, task terminates early
+
+##### Listing 7.1. Using a `volatile` Field to hold Cancellation State
+```java
+@ThreadSafe
+public class PrimeGenerator implements Runnable {
+  @GuardedBy("this")
+  private final List<BigInteger> primes = new ArrayList<>();
+  private volatile boolean cancelled;
+
+  public void run() {
+    BigInteger p = BigInteger.ONE;
+    while (!cancelled) {
+      p = p.nextProbablyPrime();
+      synchronized (this) {
+        primes.add(p);
+      }
+    }
+  }
+
+  public void cancel() { cancelled = true; }
+
+  public synchronized List<BigInteger> get() {
+    return new ArrayList<>(primes);
+  }
+}
+```
+
+- Polls `volatile` flag and returns early if the flag is set
+
+##### Listing 7.2. Generating a Second's Worth of Prime Numbers
+```java
+List<BigInteger> aSecondOfPrimes() throws InterruptedException {
+  PrimeGenerator generator = new PrimeGenerator();
+  new Thread(generator).start();
+  try {
+    SECONDS.sleep(1);
+  } finally {
+    generator.cancel();
+  }
+  return generator.get();
+}
+```
+
+- May not stop after eactly 1 second
+  - Some delay between cancellation and next loop check
+
+- Code must have cancellation policy
+  - "how", "when", "what" other code can request cancellation
 
 #### 7.1.1. Interruption
+- Cancellation in `PrimeGenerator` may take a while
+- If task calls blocking method, task might never check cancellation flag and might never terminate
+
+##### Listing 7.3. Unreliable Cancellation That Can Leave Producers in a Blocking Operation. _DO NOT DO THIS_
+```java
+class BrokenPrimeProducer extends Thread {
+  private final BlockingQueue<BigInteger> queue;
+  private volatile boolean cancelled = false;
+
+  BrokenPrimeProducer(BlockingQueue<BigInteger> queue) {
+    this.queue = queue;
+  }
+
+  public void run() {
+    try {
+      BigInteger p = BigInteger.ONE;
+      whiel (!cancelled) {
+        queue.put(p = p.nextProbablePrime());
+      } catch (InterruptedException consumed){ }
+    }
+  }
+
+  public void cancel() { cancelled = true; }
+}
+
+void consumePrimes() throws InterruptedException {
+  BlockingQueue<BigInteger> primes = ...;
+  BrokenPrimeProducer producer = new BrokenPrimeProducer(primes);
+  producer.start();
+  try {
+    while (needMorePrimes()) {
+      consume(primes.take());
+    }
+  } finally {
+    producer.cancel();
+  }
+}
+```
+
+- If producer gets ahead of consumer and queue is full, `put` will block
+- If consumer tries to cancel, it will set cancelled flag but producer will never check
+  - Still blocked
+- Nothing official, but using interruption for anything except cancellation is suspect
+- Each thread has boolean interrupted status
+  - Interrupting thread sets the status to true
+- `interrupt` method interrupts target thread
+- `isInterrupted` returns interrupted status
+- `interrupted` clears interrupted status of current thread and returns previous value
+- `Thread.sleep` and `Object.wait` try to detect interruption and return early
+  - Respond by clearing interrupted status and throwing `InterruptedException`
+  - No guarantee how quickly this happens, but usually quick
+
+##### Listing 7.4. Interruption Methods in `Thread`
+```java
+public class Thread {
+  public void interrupt() { ... }
+  public boolean isInterrupted(){ ... }
+  public static boolean interrupted() { ... }
+}
+```
+
+- If thread interrupted when not blocked, interrupted status is set
+  - Up to activity being performed to detect interruption
+- Interruption is sticky
+  - If no `InterruptedException`, status will stay until it is explicitly cleared
+- Interruption is only a request
+- Well behaved methods may ignore interruption as long as they allow calling code to do something with it
+  - Poorly behaved methods swallow the interruption
+- `interrupted` should be used with caution
+  - Clears current status
+  - If returns `true`, either throw `InterruptedException` or restore interrupted status (`interrupt`)
+- `BrokenPrimeProducer` can be fixed with interruption
+  - 2 places where interruption can be detected
+    - Blocking `put` call
+    - Polling interrupted status in loop
+
+##### Listing 7.5. Using Interruption for Cancellation
+```java
+class PrimeProducer extends Thread {
+  private final BlockingQueue<BigInteger> queue;
+
+  PrimeProducer(BlockingQueue<BigInteger> queue) {
+    this.queue = queue;
+  }
+
+  public void run() {
+    try {
+      BigInteger p = BigInteger.ONE;
+      while (!Thread.currentThread().isInterrupted()) {
+        queue.put(p = p.nextProbablePrime());
+      } catch (InterruptedException consumed) {
+        // Allow thread to exit
+      }
+    }
+
+    public void cancel() { interrupt(); }
+  }
+}
+```
 
 #### 7.1.2. Interruption Policies
+- Interruption policy determines how thread interprets interruption
+  - What it does
+  - What units of work are atomic with interruption
+  - How quickly it reacts to interruption
+- Most sensible is thread-level or service-level cancellation
+  - Exit as quickly as possible (with cleanup)
+  - Possibly notify something that thread is exiting
+- Possible to pause/resume a service
+  - Thread pools with nonstandard interruption policies restricted to tasks that are aware of policy
+- Interruption may mean both cancel current task and shutdown worker thread
+- Tasks don't execut in threads they own
+  - Execute in borrowed threads (e.g. thread pool)
+- Guest code should preserve interrupted status
+- Most blocking library methods will simply throw `InterrutedException`
+  - Get out of the way and let caller take action
+- Task doesn't need to respond to interruption immediately
+  - May clean up data structures
+- Task shouldn't assume interruption policy of executing thread
+  - Unless service has specific interruption policy
+- Cancellation code should not assumpe interruption policy of arbitrary threads
+- Thread should only be interrupted by its owner
+- Should not interrupt thread unless you know what interruption means for that thread
 
 #### 7.1.3. Responding to Interruption
+- 2 strategies for handling `InterruptedException`
+  - Propagate exception
+  - Restore interruption status so calling code can deal with it
+
+##### Listing 7.6. Propagating `InterruptedException` to Callers
+```java
+BlockingQueue<Task> queue;
+...
+public Task getNExtTask() throws InterruptedException {
+  return queue.take();
+}
+```
+
+- Can be as adding `InterruptedException` to `throws` clause
+- If can't propagate `InterruptedException`, need to preserve interruption request
+  - Standard way is to call `interrupt` again
+- Do not swallow `InterruptedException`
+- Only code that implements thread's interruption policy may swallow interruption request
+- Activities that do not support cancellation but call interruptible blocking methods need to call in loop
+  - Retry when interrupted
+  - Preserve interrupt status and restore just before returning
+  - Setting too early could result in infinite loop
+
+##### Listing 7.7. Noncancelable Task That Restores Interruption Before Exit
+```java
+public Task getNextTask(BlockingQueue<Task> queue) {
+  boolean interrupted = false;
+  try {
+    while (true) {
+      try {
+        return queue.take();
+      } catch (InterruptedException e) {
+        interrupted = true;
+        // fall through and retry
+      }
+    }
+  } finally {
+    if (interrupted) {
+      Thread.currentThread().interrupt();
+    }
+  }
+}
+```
+
+- If code does not call interruptible blocking methods, could poll interrupted status
+- Interruption could be used to get thread's attention
+  - Out-of-band information for more instruction about what to do
 
 #### 7.1.4. Example: Timed Run
 
