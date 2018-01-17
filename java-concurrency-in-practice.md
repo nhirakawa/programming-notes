@@ -3236,6 +3236,7 @@ public class IndexerThread extends Thread {
     - If object has references to objects, state encompasses fields from referenced objects
   
 ##### Listing 4.1 Simple Thread-safe Counter Using the Java Monitor Pattern
+
 ```java
 @ThreadSafe
 public final class Counter {
@@ -3259,9 +3260,10 @@ public final class Counter {
   - Specifies what combination of immutability, thread confinement, and locking is used to maintain thread safety and which variables are guarded by locks.
 
 #### 4.1.1 Gathering Synchronization Requirements
+
 - Making class thread-safe means ensuring invariants hold under concurrent access
 - Objects and variables have state space
-    - Range of possible values
+  - Range of possible values
 - Smaller state space is easier to reason about
 - By using final fields wherever practical, simpler to analyze possible states
   - Immutable objects can only be in single state
@@ -3280,6 +3282,7 @@ public final class Counter {
   - Object may be in invalid state between acquiring locks
 
 #### 4.1.2 State-dependent Operations
+
 - Some objects have methods with state-based preconditions
   - Cannot remove item from empty queue
 - Called _state-dependent_ operations
@@ -3292,6 +3295,7 @@ public final class Counter {
   - Blocking queues or semaphores
 
 #### 4.1.3 State Ownership
+
 - When defining object state, only consider the data the object owns
 - Not embedded in language, element of class design
 - When allocating/populating `HashMap`
@@ -3305,6 +3309,7 @@ public final class Counter {
   - Collection owns state of infrastructure, client owns state of actual objects
 
 #### 4.2 Instance Confinement
+
 - If object is not thread-safe, techniques to let it be used safely
   - Ensure it is accessed from single thread
   - Ensure all access is guarded by lock
@@ -3318,6 +3323,7 @@ public final class Counter {
   - Thread
 
 ##### Listing 4.2 Using Confinement to Ensure Thread Safety
+
 ```java
 @ThreadSafe
 public class PersonSet {
@@ -3347,10 +3353,12 @@ public class PersonSet {
   - As long as only reference is wrapped, access is thread-safe
 
 #### 4.2.1 The Java Monitor Pattern
+
 - Object encapsulates all its mutable state and guards it with own intrinsic lock
 - Any lock object can be used as long as use is consistent
 
 ##### Listing 4.3 Guarding State with a Private Lock
+
 ```java
 public class PrivateLock {
   private final Object myLock = new Object();
@@ -3368,6 +3376,7 @@ public class PrivateLock {
   - Clients that improperly acquire locks can cause liveness problems
 
 #### 4.2.2 Example: Tracking Fleet Vehicles
+
 - Build a vehicle tracker for dispatching fleet vehicles
   - Taxis, police cars, delivery trucks
 
@@ -3388,6 +3397,7 @@ void vehicleMoved(VehicleMovedEvent event) {
 - Data model must be thread-safe because GUI thread and updater thread will access concurrently
 
 ##### 4.4 Monitor-based Vehicle Tracker Implementation
+
 ```java
 @ThreadSafe
 public class MonitorVehicleTracker {
@@ -3429,6 +3439,7 @@ public class MonitorVehicleTracker {
 ```
 
 ##### Listing 4.5. Mutable Point Class Similar to `Java.awt.Point`
+
 ```java
 @NotThreadSafe
 public class MutablePoint {
@@ -3451,17 +3462,20 @@ public class MutablePoint {
 - Copying mutable data may be performance issue at-scale
 
 ### 4.3 Delegating Thread Safety
+
 - Sometimes need to add additional layer of safety, even if components are already thread-safe
 - `CountingFactorizer` was thread-safe after adding an `AtomicLong`
   - Entire state of `CountingFactorizer` in `AtomicLong` and no additional validity requirements
 - `CountingFactorizer` _delegates_ thread safety to `AtomicLong`
 
 #### 4.3.1. Example: Vehicle Tracker Using Delegation
+
 - Construct the vehicle tracker with thread-safe `Map`
   - `ConcurrentHashMap`
 - Also store location in immutable `Point` class
 
 ##### 4.6 Immutable `Point` class used by `DelegatingVehicleTracker`
+
 ```java
 @Immutable
 public class Point {
@@ -3475,6 +3489,7 @@ public class Point {
 ```
 
 ##### 4.7 Delegating Thread Safety to a `ConcurrentHashMap`
+
 ```java
 @ThreadSafe
 public class DelegatingVehicleTracker {
@@ -3508,6 +3523,7 @@ public class DelegatingVehicleTracker {
   - Could be a benefit or a liability
 
 ##### Listing 4.8. Returning a Static Copy of the Location Set Instead of a "Live" One
+
 ```java
 public Map<String, Point> getLocations() {
   return Collections.unmodifiableMap(new HashMap<>(locations));
@@ -3515,11 +3531,13 @@ public Map<String, Point> getLocations() {
 ```
 
 #### 4.3.2. Independent State Variables
+
 - Can also delegate thread safety to multiple state variables
   - As long as they are independent
   - Enclosing class does not impose invariants involving multiple state variables
 
 ##### Listing 4.9. Delegating Thread Safety to Multiple Underlying State Variables
+
 ```java
 public class VisualComponent {
   private final List<KeyListener> keyListeners = new CopyOnWriteArrayList<>();
@@ -3547,9 +3565,11 @@ public class VisualComponent {
 - `VisualComponent` delegates thread safety to underlying `mouseListeners` and `keyListeners`
 
 #### 4.3.3. When Delegation Fails
+
 - Most classes are not as simple
 
 ##### Listing 4.10. Number Range Class that does Not Sufficiently Protect Its Invariants. _Don't do this._
+
 ```java
 public class NumberRange {
   // INVARIANT: lower <= upper
@@ -3585,6 +3605,7 @@ public class NumberRange {
 - Must also avoid publishing `lower` and `upper`
 
 #### 4.3.4. Publishing underlying state variables
+
 - When can you publish state variables when delegating thread-safety to them?
   - It depends
 - Publishing state variables means other classes can change them
@@ -3592,9 +3613,11 @@ public class NumberRange {
 - If state variable is thread-safe, does not participate in invariants, and has no prohibited state transitions, it can be published
 
 #### 4.3.5. Example: Vehicle Tracker that Publishes Its State
+
 - Another version of vehicle tracker that publishes mutable state
 
 ##### Listing 4.11 Thread-safe Mutable Point Class
+
 ```java
 @ThreadSafe
 public class SafePoint {
@@ -3628,6 +3651,7 @@ public class SafePoint {
   - If separate getters, values could change between calls
 
 ##### Listing 4.12 Vehicle Tracker That Safely Publishes Underlying State
+
 ```java
 @ThreadSafe
 public class PublishingVehicleTracker {
@@ -3662,6 +3686,7 @@ public class PublishingVehicleTracker {
   - Whether or not this is desired depends on the requirements
 
 ### 4.4. Adding Functionality To Existing Thread-Safe Classes
+
 - Sometimes need to add new operations without undermining thread safety
 - E.g. Adding an atomic put-if-absent method for a `List`
 - May not always have access to underlying source
@@ -3670,6 +3695,7 @@ public class PublishingVehicleTracker {
   - Fragile because synchronization policy now lives in multiple classes
 
 ##### Listing 4.13. Extending `Vector to have a `put-if-absent` method
+
  ```java
 @ThreadSafe
 public class BetterVector<E> extends Vector<E> {
@@ -3684,11 +3710,13 @@ public class BetterVector<E> extends Vector<E> {
  ```
 
 #### 4.4.1. Client-side Locking
+
 - For `ArrayList` wrapped with `Collections.synchronizedList`, neither approach works
 - Third strategy is to extend the functionality without extending the class
   - Helper class
 
 ##### Listing 4.14. Non-thread-safe Attempt to Implement a put-if-absent. _Don't do this_
+
 ```java
 @NotThreadSafe
 public class ListHelper<E> {
@@ -3703,11 +3731,13 @@ public class ListHelper<E> {
   }
 }
 ```
+
 - Won't work because synchronizes on the wrong lock
 - No guarantee another thread won't modify the list while `putIfAbsent` is executing
 - `Vector` documentation uses intrinsic lock
 
 ##### Listing 4.15. Implementing put-if-absent with Client-Side Locking
+
 ```java
 @ThreadSafe
 public class ListHelper<E> {
@@ -3729,9 +3759,11 @@ public class ListHelper<E> {
   - Puts locking code for class `C` into classes that are not `C`
 
 #### 4.4.2. Composition
+
 - Less fragile alternative
 
 ##### Listing 4.16. Implementing put-if-absent Using Composition
+
 ```java
 @ThreadSafe
 public class ImprovedList<T> implements List<T> {
@@ -3761,6 +3793,7 @@ public class ImprovedList<T> implements List<T> {
 - Guaranteed thread safety as long as our class holds only reference to underlying `List`
 
 ### 4.5. Documenting Synchronization Policies
+
 - Users look to documentation to see if class is thread-safe
   - Document thread-safety
 - Maintainers look to understand implementation strategy
@@ -3771,6 +3804,7 @@ public class ImprovedList<T> implements List<T> {
 -
 
 #### 4.5.1. Interpreting Vague Documentation
+
 - Need to guess based on how it will be implemented
 - Servlets and database connections are frequently run in threads
   - Implementations should expect to need to deal with concurrent access
@@ -3778,15 +3812,18 @@ public class ImprovedList<T> implements List<T> {
 ## Chapter 5. Building Blocks
 
 ### 5.1. Synchronized Collections
+
 - Include `Vector` and `Hashtable`
   - Along with `Collections.synchronizedXxx` factory methods
 
 #### 5.1.1. Problems with Synchronized Collections
+
 - Thread-safe but may need additional locking for compound actions
   - Iteration, navigation, conditional operation (put-if-absent)
 - Technically thread-safe, but may not behave as expected under concurrent access
 
 ##### Listing 5.1. Compound Actions on a `Vector` that may produce confusing results
+
 ```java
 public static Object getLast(Vector list) {
   int lastIndex = list.size() - 1;
@@ -3798,6 +3835,7 @@ public static void deleteLast(Vector list) {
   list.remove(lastIndex);
 }
 ```
+
 - Operations can be interleaved
 - Synchronized collections use implementation that allows client-side locking
   - Possible to create new operations that are atomic
@@ -3805,6 +3843,7 @@ public static void deleteLast(Vector list) {
 - Size of list and corresponding get also affects iteration
 
 ##### Listing 5.2. Compound actions on `Vector` using client-side locking
+
 ```java
 public static Object getLast(Vector list) {
   synchronized (list) {
@@ -3822,6 +3861,7 @@ public static void deleteLast(Vector list) {
 ```
 
 ##### Listing 5.3. Iteration that may throw `ArrayIndexOutOfBoundsException`
+
 ```java
 for (int i = 0; i < vector.size(); i++) {
   doSomething(vector.get(i));
@@ -3829,6 +3869,7 @@ for (int i = 0; i < vector.size(); i++) {
 ```
 
 #### 5.1.2. Iterators and `ConcurrentModificationException`
+
 - Standard way of iterating through a `Collection` is `Iterator`
   - Explicitly or with `for-each` loop
 - Iterators returned by synchronized collections not designed to deal with concurrent modification
@@ -3840,6 +3881,7 @@ for (int i = 0; i < vector.size(); i++) {
   - Done without synchronization
 
 ##### Listing 5.5. Iterating a `List` with an `Iterator`
+
 ```java
 List<Widget> widgetList = collections.synchronizedList(new ArrayList<>());
 // May throw ConcurrentModificationException
@@ -3861,9 +3903,11 @@ for (Widget w : widgetList) {
 - Cloning still has performance cost
 
 #### 5.1.3. Hidden Iterators
+
 - Have to remember to use locking everywhere a shared collection might be iterated
 
 #####  Listing 5.6. Iteration hidden within string concatenation. _Don't do this_
+
 ```java
 public class HiddenIterator {
   @GuardedBy("this")
@@ -3893,6 +3937,7 @@ public class HiddenIterator {
   - `containsAll`, `removeAll`, and `retainAll` methods will iterate over collection parameter
 
 ### 5.2 Concurrent Collections
+
 - Java 5 provides several concurrent collection classes
 - Synchronized collections serialize all access
   - Poor concurrency
@@ -3902,6 +3947,7 @@ public class HiddenIterator {
   - Replace synchronized `SortedMap` and `SortedSet`
 
 #### 5.2.1. ConcurrentHashMap
+
 - Synchronized collections hold lock for duration of operation
   - Iterating collection might be necessary for some calls
 - `ConcurrentHashMap` uses a more performant locking strategy
@@ -3922,9 +3968,11 @@ public class HiddenIterator {
   - Only real tradeoff
 
 #### 5.2.2. Additional Atomic Map Operations
+
 - `ConcurrentMap` offers put-if-absent, remove-if-equal, and replace-if-equal atomic eoperations
 
 ##### Listing 5.7. `ConcurrentMap` interface
+
 ```java
 public interface ConcurrentMap<K, V> extends Map<K, V> {
   // Insert into map only if no value is mapped from K
@@ -3939,6 +3987,7 @@ public interface ConcurrentMap<K, V> extends Map<K, V> {
 ```
 
 #### 5.2.3. CopyOnWriteArrayList
+
 - Concurrent replacement for synchronized `List`
 - Rely on properly publishing immutable objects
 - Create and republish new copy of collection every time it is modified
@@ -3949,6 +3998,7 @@ public interface ConcurrentMap<K, V> extends Map<K, V> {
   - E.g. event-notification systems
 
 ### 5.3. Blocking Queues and the Producer-Consumer Pattern
+
 - Blocking queues provide blocking `put` and `take` methods
   - Also timed `offer` and `put`
 - If queue is full/empty, thread will block until condition is met
@@ -3967,9 +4017,11 @@ public interface ConcurrentMap<K, V> extends Map<K, V> {
   - Can use alternate strategy (shedding load, write to disk, scale down, throttling)
 
 #### 5.3.1. Example: Desktop Search
+
 - Producer task searches for files meeting index criteria, consumer task takes file names and indexes them
 
 ##### Listing 5.7. Producer and Consumer Tasks in a Desktop Search Application
+
 ```java
 public class FileCrawler implements Runnable {
   private final BlockingQueue<File> fileQueue;
@@ -4018,6 +4070,7 @@ public class Indexer implements Runnable {
 ```
 
 ##### Listing 5.9. Starting the Desktop Search
+
 ```java
 public static void startIndexing(File[] roots) {
   BlockingQueue<File> queue = new LinkedBlockingQueue<File>(BOUND);
@@ -4036,6 +4089,7 @@ public static void startIndexing(File[] roots) {
 ```
 
 #### 5.3.2. Serial Thread Confinement
+
 - Blocking queue implementations contain sufficient internal synchronization to safely publish objects from producer thread to consumer thread
 - For mutable objects, facilitate serial thread confinement
   - Owned exclusively by thread, but ownership can be transferred by publishing it
@@ -4044,6 +4098,7 @@ public static void startIndexing(File[] roots) {
 - Could use other publication methods but necessary to ensure only one thread receives it
 
 #### 5.3.3. Deques and Work Stealing
+
 - Java 6 also adds `Deque` ("deck") and `BlockingDeque`
   - Double-ended queue
 - Useful for work stealing
@@ -4052,6 +4107,7 @@ public static void startIndexing(File[] roots) {
   - When accessing other deques, read from tail instead of head further reduces contention
 
 ### 5.4. Blocking and Interruptible Methods
+
 - Threads may block
   - I/O, lock, wake up from `Thread.sleep`, computation on another thread
 - Usually suspended and placed in a blocked thread state
@@ -4071,6 +4127,7 @@ public static void startIndexing(File[] roots) {
     - Code higher in the call stack will see that an interrupt was issued
 
 ##### Listing 5.10. Restoring the Interrupted Status so as Not to Swallow the Interrupt
+
 ```java
 public class TaskRunnable implements Runnable {
   BlockingQueue<Task> queue;
@@ -4091,6 +4148,7 @@ public class TaskRunnable implements Runnable {
   - Only acceptable when extending Thread and control all code higher in the call stack
 
 ### 5.5. Synchronizers
+
 - Blocking queues act as containers, and coordinate flow of producer and consumer threads
 - Synchronizer is object that coordinates flow of threads based on its state
   - e.g. blocking queues, semaphores, barriers, latches
@@ -4099,6 +4157,7 @@ public class TaskRunnable implements Runnable {
 - Provide methods to wait efficiently for synchronizer to enter desired state
 
 #### 5.5.1. Latches
+
 - Delays progress of threads until it reaches terminal state, like a gate
 - Until latch reaches terminal state, gate is closed and no thread passes
 - In terminal state, latch opens and all threads pass
@@ -4114,6 +4173,7 @@ public class TaskRunnable implements Runnable {
   - `await` waits for counter to reach 0
 
 ##### Listing 5.11. Using `CountDownLatch` for Starting and Stopping Threads in Timing Tests
+
 ```java
 public long timeTasks(int nThreads, final Runnable task) throws InterruptedException {
   final CountDownLatch startGate = new CountDownLatch(1);
@@ -4149,6 +4209,7 @@ public long timeTasks(int nThreads, final Runnable task) throws InterruptedExcep
 - Master thread wiats until last worker has finished, so it can calculate elapsed time
 
 #### 5.5.2. FutureTask
+
 - Acts like a latch
 - Implemented with a `Callable`
   - 3 states: waiting to run, running, completed
@@ -4162,6 +4223,7 @@ public long timeTasks(int nThreads, final Runnable task) throws InterruptedExcep
 - Can be used to represent lengthy computation that is started before results are needed
 
 ##### Listing 5.12. Using `FutureTask` to Preload Data that is Needed Later
+
 ```java
 public class Preloader {
   private final FutureTask<ProductInfo> future = new FutureTask<ProductInfo>(new Callables<ProductInfo>() {
@@ -4205,6 +4267,7 @@ public ProductInfo get() throws DataLoadException, InterruptedException {
   - Throw `IllegalStateException` for non-`RuntimeException`s
 
 ##### Listing 5.13. Coercing an Unchecked `Throwable` to a `RuntimeException`
+
 ```java
 public static RuntimeException launderThrowable(Throwable t) {
   if (t instanceof RuntimeException) {
@@ -4218,6 +4281,7 @@ public static RuntimeException launderThrowable(Throwable t) {
 ```
 
 #### 5.5.2. Semaphores
+
 - Counting semaphores control number of activities that access resource or perform action at the same time
 - Can be used to implement resource pools or impose bound
 - `Semaphore` manages set of permits
@@ -4232,6 +4296,7 @@ public static RuntimeException launderThrowable(Throwable t) {
 - Can also use to turn any collection into a bounded blocking collection
 
 ##### Listing 5.14. Using `Semaphore` to Bound a Collection
+
 ```java
 public class BoundedHashSet<T> {
   private final Set<T> set;
@@ -4266,6 +4331,7 @@ public class BoundedHashSet<T> {
 ```
 
 #### 5.5.4. Barriers
+
 - Latches are single-use
 - Barriers are similar to latches
   - Block a group of threads until some event has occurred
@@ -4284,6 +4350,7 @@ public class BoundedHashSet<T> {
   - Each step must complete before next step begins
 
 ##### Listing 5.15. Coordinating Computation in a Cellular Automaton with `CyclicBarrier`
+
 ```java
 public class CellularAutomata {
   private final Board mainBoard;
@@ -4347,9 +4414,11 @@ public class CellularAutomata {
   - Exchange when buffer is full, or certain amount of time has elapsed
 
 ### 5.6. Building an Efficient, Scalable Result Cache
+
 - Naive cache implementation turns performance bottleneck into scalability bottleneck
 
 ##### Listing 5.16. Initial Cache Attempt using `HashMap` and Synchronization
+
 ```java
 public interface Computable<A, V> {
   V compute(A arg) throws InterruptedException;
@@ -4387,6 +4456,7 @@ public class Memoizer1<A, V> implements Computable<A, V> {
   - `HashMap` is not thread safe, so takes conservative approach of using `synchronized`
 
 ##### Listing 5.17. Replacing `HashMap` with `ConcurrentHashMap`
+
 ```java
 public class Memoizer2<A, V> implements Computable<A, V> {
   private final Map<A, V> cache = new ConcurrentHashMap<>();
@@ -4413,6 +4483,7 @@ public class Memoizer2<A, V> implements Computable<A, V> {
   - `FutureTask` does exactly this
 
 ##### Listing 5.18. Memoizing Wrapper using `FutureTask`
+
 ```java
 public class Memoizer3<A, V> implements Computable<A, V> {
   private final Map<A, Future<V>> cache = new ConcurrentHashMap<A, Future<V>>();
@@ -4450,6 +4521,7 @@ public class Memoizer3<A, V> implements Computable<A, V> {
   - Should remove cancelled futures (possible failed futures if future attempts would succeed)
 
 ##### Listing 5.19. Final Implementation of `Memoizer`
+
 ```java
 public class Memoizer<A, V> implements Computable<A, V> {
   private final ConcurrentMap<A, Future<V>> cache = new ConcurrentHashMap<>();
@@ -4486,6 +4558,7 @@ public class Memoizer<A, V> implements Computable<A, V> {
 ```
 
 ##### Listing 5.20. Factorizing Servlet that Caches Results Using `Memoizer`
+
 ```java
 @ThreadSafe
 public class Factorizer implements Servlet {
@@ -4511,6 +4584,7 @@ public class Factorizer implements Servlet {
 ## Chapter 6. Task Execution
 
 ### 6.1. Executing Tasks in Threads
+
 - First step in organizing around task execution is task boundaries
 - Ideally independent tasks
   - Work that doesn't depend on state, result, or side effects of other tasks
@@ -4519,9 +4593,11 @@ public class Factorizer implements Servlet {
   - Should also exhibit graceful degradation when overloaded
 
 #### 6.1.1. Executing Tasks Sequentially
+
 - Simplest execution policy is sequential
 
 ##### Listing 6.1. Sequential Web Server
+
 ```java
 class SingleThreadWebServer {
   public static void main(String... args) throws IOException {
@@ -4541,9 +4617,11 @@ class SingleThreadWebServer {
   - CPU is idle while waiting for I/O
 
 #### 6.1.2. Explicitly Creating Threads for Tasks
+
 - More responsive approach is new thread for each request
 
 ##### Listing 6.1.2. Explicitly Creating Threads for Tasks
+
 ```java
 class ThreadPerTaskWebServer {
   public static void main(String... args) throws IOException {
@@ -4572,6 +4650,7 @@ class ThreadPerTaskWebServer {
 - As long as request rate does not exceed server's capacity, this approach offers better responsiveness and throughput
 
 #### 6.1.3. Disadvantages of Unbounded Thread Creation
+
 - A few issues with thread-per-task approach
   - Thread lifecycle overhead
     - Creation/teardown not free
@@ -4588,9 +4667,11 @@ class ThreadPerTaskWebServer {
   - May appear fine until deployed and under heavy load
 
 ### 6.2. The Executor Framework
+
 - Thread pools offer same benefit as bounded queues for thread management
 
 ##### Listing 6.3. `Executor` Interface
+
 ```java
 public interface Executor {
   void execute(Runnable command);
@@ -4602,11 +4683,13 @@ public interface Executor {
 - Based on producer-consumer pattern
 
 #### 6.2.1. Example: Web Server Using Executor
+
 - Submission of request-handling task is decoupled from execution
 - Can easily change `Executor` implementations
   - Configuration is one-time event and can be exposed for deploy-time configuration
 
 ##### Listing 6.4. Web Server Using a Thread Pool
+
 ```java
 class TaskExecutionWebServer {
   private static final int NTHREADS = 100;
@@ -4628,6 +4711,7 @@ class TaskExecutionWebServer {
 ```
 
 ##### Listing 6.5. `Executor` that Starts a New Thread for Each Task
+
 ```java
 public class ThreadPerTaskExecutor implements Executor {
   public void execute(Runnable r) {
@@ -4639,6 +4723,7 @@ public class ThreadPerTaskExecutor implements Executor {
 - Can also create an `Executor` that processes tasks sequentially
 
 ##### Listing 6.6 `Executor` that Executes tasks Synchronously in the Calling Thread
+
 ```java
 public class WithinThreadExecutor implements Executor {
   public void execute(Runnable r) {
@@ -4648,6 +4733,7 @@ public class WithinThreadExecutor implements Executor {
 ```
 
 #### 6.2.2. Execution Policies
+
 - Decoupling submission from execution means changing execution policy is easy
   - "what, where, when, and how" of task execution
   - In what thread will tasks be executed
@@ -4659,6 +4745,7 @@ public class WithinThreadExecutor implements Executor {
 - Optimal policy depends on available resources and quality-of-service requirements
 
 #### 6.2.3. Thread Pools
+
 - Thread pools manage homogenous pool of worker threads
   - Tightly bound to work queue holding tasks to be executed
 - Worker threads request next task from queue, execute it, then go back to waiting for task
@@ -4684,6 +4771,7 @@ public class WithinThreadExecutor implements Executor {
 - Also opens door to tuning, management, monitoring, logging, error reporting, and other possibilities
 
 #### 6.2.4. Executor Lifecycle
+
 - JVM can't exit until all (nondaemon) threads have terminated
   - Failing to shutdown `Executor` may prevent JVM from exiting
 - At any given time, state of previous submitted tasks is not obvious
@@ -4695,6 +4783,7 @@ public class WithinThreadExecutor implements Executor {
 - `Executors` should be able to be shutdown (both gracefully and abruptly) and expose information about status of tasks that were affected by shutdown
 
 ##### Listing 6.7. Lifecycle Methods in `ExecutorService`
+
 ```java
 public interface ExecutorService extends Executor {
   void shutdown();
@@ -4725,6 +4814,7 @@ public interface ExecutorService extends Executor {
   - Can stop with `stop` method or through client HTTP request
 
 ##### Listing 6.8. Web Server with Shutdown Support
+
 ```java
 class LifecycleWebServer {
   private final ExecutorService exec = ...;
@@ -4759,6 +4849,7 @@ class LifecycleWebServer {
 ```
 
 #### 6.2.5. Delayed and Periodic Tasks
+
 - `Timer` manages execution of deferred and periodic tasks
 - Has some drawbacks that `ScheduledThreadPoolExecutor` patches up
 - `Timer` creates only single thread for executing timer tasks
@@ -4769,6 +4860,7 @@ class LifecycleWebServer {
   - Terminates timer thread, and it is not resurrected
 
 ##### Listing 6.9. Class Illustrating Confusing `Timer` Behavior
+
 ```java
 public class OutOfTime {
   public static void main(String... args) throws Exception {
@@ -4794,16 +4886,19 @@ public class OutOfTime {
 - Ordered by time associated with delay
 
 ### 6.3. Finding Exploitable Parallelism
+
 - Must describe task as `Runnable` to use `Executor`s
 - Example takes page of HTML and renders it to image buffer
   - Only text interspersed with image elemnts with pre-specified dimensions and URLs
 
 #### 6.3.1. Example: Sequential Page Renderer
+
 - Simplest approach is sequential
 - Can also render text elements first, leaving placeholders for images
   - Then go back and fetch/render images
 
 ##### Listing 6.10. Rendering Page Elements Sequentially
+
 ```java
 public class SingleThreadRenderer {
   void renderPage(CharSequence source) {
@@ -4820,6 +4915,7 @@ public class SingleThreadRenderer {
 ```
 
 #### 6.3.2. Result-bearing Tasks: `Callable` and `Future`
+
 - `Executor` uses `Runnable` but fairly limiting abstracting
   - Cannot return value or throw checked exceptions
   - Can have side effects
@@ -4841,6 +4937,7 @@ public class SingleThreadRenderer {
   - If `ExecutionException`, `getCause` reveals underlying cause
 
 ##### Listing 6.11. `Callable` and `Future` Interfaces
+
 ```java
 public interface Callable<V> {
   V call() throws Exception;
@@ -4862,6 +4959,7 @@ public interface Future<V> {
   - Default implementation creates new `FutureTask`
 
 ##### Listing 6.12. Default Implementation of `newTaskFor` in `ThreadPoolExecutor`
+
 ```java
 protected <T> RunnableFuture<T> newTaskFor(Callable<T> task) {
   return new FutureTask<>(task);
@@ -4872,6 +4970,7 @@ protected <T> RunnableFuture<T> newTaskFor(Callable<T> task) {
 - Setting result value for `Future` constitutes safe publication to any thread that calls `get`
 
 #### 6.3.3. Example: Page Renderer with Future
+
 - Divide into 2 tasks
   - Render text
   - Downloads images
@@ -4881,6 +4980,7 @@ protected <T> RunnableFuture<T> newTaskFor(Callable<T> task) {
   - Probably better to draw individual images as available
 
 ##### Listing 6.13. Waiting for Image Download with `Future`
+
 ```java
 public class FutureRenderer {
   private final ExecutorService executor = ...;
@@ -4917,6 +5017,7 @@ public class FutureRenderer {
 ```
 
 #### 6.3.4. Limitations of Parallelizing Heterogeneous Tasks
+
 - Heterogenous task execution doesn't scale well
   - Need finer-grained parallelism
 - If different tasks take longer, may not see much speedup
@@ -4924,6 +5025,7 @@ public class FutureRenderer {
 - Real speedup when large number of independent, homogenous tasks
 
 #### 6.3.5. `CompletionService`: Executor Meets `BlockingQueue`
+
 - If want to retrieve results as available from batch of computations, could poll `Future`s with timeout of 0
   - Tedious
 - `CompletionService` combines functionality of `Executor` and `BlockingQueue`
@@ -4931,6 +5033,7 @@ public class FutureRenderer {
 - `ExecutorCompletionService` implements `CompletionService`, delegates to `Executor`
 
 ##### Listing 6.14. `QueueingFuture` Class used By `ExecutorCompletionService`
+
 ```java
 private class QueueingFuture<V> extends FutureTask<V> {
   QueueingFuture(Callable<V> c){ super(c); }
@@ -4943,9 +5046,11 @@ private class QueueingFuture<V> extends FutureTask<V> {
 ```
 
 #### 6.3.6. Example: Page Renderer with `CompletionService`
+
 - Create separate task for downloading _each_ image
 
 ##### Listing 6.15. Using `CompletionService` to render page elements as they become available
+
 ```java
 public class Renderer {
   private final ExecutorService executor;
@@ -4982,12 +5087,14 @@ public class Renderer {
 - Private `CompletionService`s sharing common `Executor` acts as handle for batch of computations
 
 #### 6.3.7. Placing Time Limits on Tasks
+
 - Sometimes result isn't needed after certain amount of time
 - `Future` supports timeouts by throwing `TimeoutException`
 - Also need to cancel any work being done to release resources
   - If `Future` times out, can cancel the task
 
 ##### Listing 6.16. Fetching an Advertisement with a Time Budget
+
 ```java
 Page renderPageWithAd() throws InterruptedException {
   long endNanos = System.nanoTime() + TIME_BUDGET;
@@ -5009,10 +5116,12 @@ Page renderPageWithAd() throws InterruptedException {
 ```
 
 #### 6.3.8. Example: A Travel Reservations Portal
+
 - Can generalize time budget to arbitrary number of tasks
 - Rather than wait for slowest request, might be better to render only what's ready after certain time period
 
 ##### Listing 6.17. Requesting Travel Quotes Under a Time Budget
+
 ```java
 private class QuoteTask implements Callable<TravelQuote> {
   private final TravelCompany company;
@@ -5060,6 +5169,7 @@ public List<TravelQuote> getRankedTravelQuotes(TravelInfo travelInfo,
   - On return, each task will be completed or cancelled
 
 ## Chapter 7. Cancellation and Shutdown
+
 - Sometimes want to stop tasks or threads early
   - Cancel operation or application needs to shutdown
 - Java has no way to force-stop a thread
@@ -5069,6 +5179,7 @@ public List<TravelQuote> getRankedTravelQuotes(TravelInfo travelInfo,
 - Instead clean up any in-progress work then terminate
 
 ### 7.1. Task Cancellation
+
 - Activity is cancellable if external code can move it to completion earlier than normal
 - Several reasons why
   - User-requested cancellation
@@ -5080,6 +5191,7 @@ public List<TravelQuote> getRankedTravelQuotes(TravelInfo travelInfo,
   - If flag is set, task terminates early
 
 ##### Listing 7.1. Using a `volatile` Field to hold Cancellation State
+
 ```java
 @ThreadSafe
 public class PrimeGenerator implements Runnable {
@@ -5108,6 +5220,7 @@ public class PrimeGenerator implements Runnable {
 - Polls `volatile` flag and returns early if the flag is set
 
 ##### Listing 7.2. Generating a Second's Worth of Prime Numbers
+
 ```java
 List<BigInteger> aSecondOfPrimes() throws InterruptedException {
   PrimeGenerator generator = new PrimeGenerator();
@@ -5128,10 +5241,12 @@ List<BigInteger> aSecondOfPrimes() throws InterruptedException {
   - "how", "when", "what" other code can request cancellation
 
 #### 7.1.1. Interruption
+
 - Cancellation in `PrimeGenerator` may take a while
 - If task calls blocking method, task might never check cancellation flag and might never terminate
 
 ##### Listing 7.3. Unreliable Cancellation That Can Leave Producers in a Blocking Operation. _DO NOT DO THIS_
+
 ```java
 class BrokenPrimeProducer extends Thread {
   private final BlockingQueue<BigInteger> queue;
@@ -5181,6 +5296,7 @@ void consumePrimes() throws InterruptedException {
   - No guarantee how quickly this happens, but usually quick
 
 ##### Listing 7.4. Interruption Methods in `Thread`
+
 ```java
 public class Thread {
   public void interrupt() { ... }
@@ -5205,6 +5321,7 @@ public class Thread {
     - Polling interrupted status in loop
 
 ##### Listing 7.5. Using Interruption for Cancellation
+
 ```java
 class PrimeProducer extends Thread {
   private final BlockingQueue<BigInteger> queue;
@@ -5229,6 +5346,7 @@ class PrimeProducer extends Thread {
 ```
 
 #### 7.1.2. Interruption Policies
+
 - Interruption policy determines how thread interprets interruption
   - What it does
   - What units of work are atomic with interruption
@@ -5253,11 +5371,13 @@ class PrimeProducer extends Thread {
 - Should not interrupt thread unless you know what interruption means for that thread
 
 #### 7.1.3. Responding to Interruption
+
 - 2 strategies for handling `InterruptedException`
   - Propagate exception
   - Restore interruption status so calling code can deal with it
 
 ##### Listing 7.6. Propagating `InterruptedException` to Callers
+
 ```java
 BlockingQueue<Task> queue;
 ...
@@ -5327,7 +5447,8 @@ public static void timedRun(Runnable r, long timeout, TimeUnit unit) {
 
 - Violates rule of not interrupting threads when not knowing interruption policy
 
-##### Listing 7.9. Interrupting a Task in a Dedicated Thread.
+##### Listing 7.9. Interrupting a Task in a Dedicated Thread
+
 ```java
 public static void timedRun(final Runnable r, long timeout, TimeUnit unit) throws InterruptedException {
   class RethrowableTask implements Runnable {
@@ -5415,6 +5536,7 @@ public static void timedrun(Runnable r, long timeout, TimeUnit unit) throws Inte
   - Explicit `Lock` class offer `lockInterruptibly`
 
 ##### Listing 7.11. Encapsulating Nonstandard Cancellation in a `Thread` by Overriding `Interrupt`
+
  ```java
 public class ReaderThread extends Thread {
   private final Socket socket;
