@@ -16,6 +16,7 @@
   - Generally no guarantee that a read will be eventually consistent
 
 ##### Example
+
 ```java
 public class NoVisibility {
 
@@ -189,6 +190,7 @@ public class ThisEscape {
   - By passing it into constructor or `Thread`/`Runnable` is an inner class
 - Starting the thread from constructor, not simply creating, is the issue
   - Expose a `start` or `initialize` method that starts the owned thread
+
 If tempted, avoid improper construction by using a private constructor and public factory method
 
 ##### Listing 3.8 Using a Factory Method to Prevent the `this` reference from Escaping During Construction
@@ -240,7 +242,7 @@ public class SafeListener {
   - Exist on executing thread's stack, which is not accessible to other threads
 - No way to obtain reference to primitive variables, so language semantics ensure that primitive local variables are always stack confined
  
- ##### Listing 3.9 Thread Confinement of Local Primitive and Reference Variables
+##### Listing 3.9 Thread Confinement of Local Primitive and Reference Variables
 
  ```java
 public int loadTheArk(Collection<Animal> candidates) {
@@ -996,7 +998,7 @@ public class PublishingVehicleTracker {
 - Another approach is to extend the class
   - Fragile because synchronization policy now lives in multiple classes
 
-##### Listing 4.13. Extending `Vector to have a `put-if-absent` method
+##### Listing 4.13. Extending `Vector` to have a `put-if-absent` method
 
  ```java
 @ThreadSafe
@@ -1103,7 +1105,6 @@ public class ImprovedList<T> implements List<T> {
 - Use of `synchronized`, `volatile`, or thread-safe class reflects synchronization policy
 - Current documentation is lacking
   - `java.text.SimpleDateFormat` is not thread-safe, but not documented as such until JDK 1.4
--
 
 #### 4.5.1. Interpreting Vague Documentation
 
@@ -1208,7 +1209,7 @@ for (Widget w : widgetList) {
 
 - Have to remember to use locking everywhere a shared collection might be iterated
 
-#####  Listing 5.6. Iteration hidden within string concatenation. _Don't do this_
+##### Listing 5.6. Iteration hidden within string concatenation. _Don't do this_
 
 ```java
 public class HiddenIterator {
@@ -1589,7 +1590,7 @@ public static RuntimeException launderThrowable(Throwable t) {
 - `Semaphore` manages set of permits
   - Initial number is passed to constructor
 - Activities acquire permits (if there are any available) and release them
-  -  `acquire` blocks until a permit is available, or until interrupted, or until operation times out
+  - `acquire` blocks until a permit is available, or until interrupted, or until operation times out
   - `release` returns permit
 - Degenerate case of binary semaphore
   - Can be used as a mutex
@@ -3191,19 +3192,235 @@ public class IndexerThread extends Thread {
 
 #### 7.2.4. Example: A One-shot Execution Service
 
+- If method works on several tasks (and doesn't return until finished), can use executor service with lifecycle bound by method
+
+##### Listing 7.20. Using a Private `Executor` Whose Lifetime is Bounded by Method Call
+
+```java
+boolean checkMail(Set<String> hosts, long timeout, TimeUnit unit) throws InterruptedException {
+  ExecutorService exec = Executor.newCachedThreadPool();
+}
+```
+
 #### 7.2.5. Limitations of `shutdownNow`
+
+- When `ExecutorService#shutdownNow` is called, returns list of tasks that were submitted but never started
+- No general way to find out which tasks started but did not complete
+
+##### Listing 7.21 `ExecutorService` that Keeps Track of Cancelled Tasks After Shutdown
+
+```java
+public class TrackingExecutor extends AbstractExecutorService {
+  private final ExecutorService exec;
+  private final Set<Runnable> tasksCancelledAtShutdown = Collections.synchronizedSet(new HashSet<Runnable>());
+
+  public List<Runnable> getCancelledTasks() {
+    if (!exec.isTerminated()) {
+      throw new IllegalStateException(...);
+    }
+    return new ArrayList<Runnable>(tasksCancelledAtShutdown);
+  }
+}
+
+public void execute(final Runnable runnable) {
+  exec.execute(new Runnable() {
+    public void run() {
+      try {
+        runnable.run();
+      } finally {
+        if (isShutdown() && Thread.currentThread().isInterrupted()) {
+          tasksCancelledAtShutdown.add(runnable);
+        }
+      }
+    }
+  });
+
+  // delegate other ExecutorService methods to exec
+}
+```
+
+- Unavoidable race condition
+  - Tasks may be marked cancelled when actually completed
+  - Thread pool could be shutdown between when last instruction of task executes and when pool records task as complete
+
+##### Listing 7.22. Using `TrackingExecutorService` to Save Unfinished Tasks for Later Execution.
+
+```java
+public abstract class WebCrawler {
+  private volatile TrackingExecutor exec;
+  @GuardedBy("this")
+  private final Set<URL> urlsToCrawl = new HashSet<>();
+  ...
+  public synchronized void start() {
+    exec = new TrackingExecutor(Executors.newCachedThreadPool());
+    for (URL url : urlsToCrawl) {
+      submitCrawlTask(url);
+    }
+    urlsToCrawl.clear();
+  }
+
+  public synchronized void stop() throws InterruptedException {
+    try {
+      saveUncrawled(exec.shutdownNow());
+      if (exec.awaitTermination(TIMEOUT, UNIT)) {
+        saveUncrawled(exec.getCancelledTasks());
+      }
+    } finally {
+      exec = null;
+    }
+  }
+
+  protected abstract List<URL> processPage(URL url);
+
+  private void saveUncrawled(List<Runnable> uncrawled) {
+    for (Runnable task : uncrawled) {
+      urlsToCrawl.add(((CrawlTask) task).getPage());
+    }
+
+    private void submitCrawlTask(URL url) {
+      exec.execute(new CrawlTask(url));
+    }
+
+    private class CrawlTask implements Runnable {
+      private final URL url;
+      ...
+      public void run() {
+        for (URL link : processPage(url)) {
+          if (Thread.currentThread().isInterrupted()) {
+            return;
+          }
+
+          submitCrawlTask(link);
+        }
+      }
+
+      public URL getPage() {
+        return url;
+      }
+    }
+  }
+}
+```
 
 ### 7.3. Handling Abnormal Thread Termination
 
+- Exceptional console termination is obvious
+  - Process stops and produces stack trace
+- Not so obvious in concurrent application
+  - Stack trace may be printed to console, but no one watching
+- Ways to detect and prevent threads from "leaking"
+- `RuntimeException` is leading cause of premature death
+  - Not generally caught anywhere
+- Can catch unchecked exceptions
+  - Then make sure framework knows and can take action
+
+##### Listing 7.23. Typical Thread-pool Worker Thread Structure
+
+```java
+public void run() {
+  Throwable thrown = null;
+  try {
+    while (!isInterrupted()) {
+      runTask(getTaskFromWorkQueue());
+    } catch (Throwable e) {
+      thrown = e;
+    } finally {
+      threadExited(this, thrown);
+    }
+  }
+}
+```
+
 #### 7.3.1. Uncaught Exception Handlers
+
+`Thread` provides `UncaughtExceptionHandler`
+  - Detect when thread dies to uncaught exception
+- JVM reports uncaught exception to application-provided `UncaughtExceptionHandler`
+  - Default is print stack trace to `System.err`
+
+##### Listing 7.24. `UncaughtExceptionHandler` interface
+
+```java
+public interface UncaughtExceptionHandler {
+  void uncaughtException(thread t, Throwable e);
+}
+```
+
+- What handler does depends on requirements
+  - Simplest is write error message and stack trace to log
+  - Could try restarting thread, shutting down application, paging operator, something else
+
+##### Listing 7.25. `UncaughtExceptionHandler` that Logs The Exception
+
+```java
+public class UnhandledExceptionLogger implements Thread.UncaughtExceptionHandler {
+  public void uncaughtExcetpion(Thread t, Throwable e) {
+    Logger logger = Logger.getAnonymousLogger();
+    logger.log(Level.SEVERE, "Thread terminated with exception: " + t.getName(), e);
+  }
+}
+```
+
+- Without an exception handler, tasks can appear to fail silently
+- Exceptions only make it to exception handler when submitted with `execute`
+- Any thrown exception, checked or not, is part of task return status for `submit`
 
 ### 7.4. JVM Shutdown
 
+- JVM can shutdown orderly or abruptly
+- Orderly shutdown initiated when last nondaemon thread terminates, `System.exit`, or platform-specific means (e.g. `SIGINT`)
+- Abrupt shutdown initiated with `Runtime.halt` or kill signal (e.g. `SIGKILL`)
+
 #### 7.4.1. Shutdown Hooks
+
+- For orderly shutdown, JVM starts all registered shutdown hooks
+  - Added with `Runtime.addShutdownHook`
+  - No ordering guarantees
+- Application threads run concurrently with shutdown
+- JVM may run finalizers if `runFinalizersOnExit`
+- Application threads are terminated abruptly when JVM halts
+- JVM not required to do anything for abrupt shtudown
+- Shutdown hooks should be thread-safe
+  - Make no assumptions about state of application
+- Can be used for service/application clean up
+  - Delete temporary files, clean up resources not handled by OS
+- To avoid race conditions, use 1 shutdown hook that calls many actions
+
+##### Listing 7.26. Registering a Shutdown Hook to Stop the Logging Service
+
+```java
+public void start() {
+  Runtime.getRuntime().addShutdownHook(new Thread() {
+    public void run() {
+      try {
+        LogService.this.stop();
+      } catch (InterruptedException ignored) { }
+    }
+  });
+}
+```
 
 #### 7.4.2. Daemon Threads
 
+- Daemon threads don't prevent JVM from shutting down
+- All threads created at startup are daemon (except `main`)
+- Thread inherits daemon status from parent
+- When JVM shuts down, checks running threads
+  - If only threads running are daemon, orderly shutdown
+  - No `finally`, stacks are not unwound
+- Use sparingly
+- Not substitute for managing lifecycle of services
+
 #### 7.4.3. Finalizers
+
+- Some resources need to be explicitly returned to operating system
+- `finalize` is called so persistent resources can be released
+- Finalizers can be accessed by more than one thread
+  - Synchronization needed
+- No guaranteed when or if run, significant performance cost
+  - And difficult to write correctly
+- Usually combination of `finally` and `close` does better job
+  - Except for native methods
 
 ## Chapter 8. Applying Thread Pools
 
