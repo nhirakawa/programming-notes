@@ -64,7 +64,7 @@ public class NoVisibility {
   }
   ```
 
-  ##### Listing 3.3 Thread-safe Mutable Integer Holder
+##### Listing 3.3 Thread-safe Mutable Integer Holder
 
   ```java
 @ThreadSafe
@@ -3243,7 +3243,7 @@ public void execute(final Runnable runnable) {
   - Tasks may be marked cancelled when actually completed
   - Thread pool could be shutdown between when last instruction of task executes and when pool records task as complete
 
-##### Listing 7.22. Using `TrackingExecutorService` to Save Unfinished Tasks for Later Execution.
+##### Listing 7.22. Using `TrackingExecutorService` to Save Unfinished Tasks for Later Execution
 
 ```java
 public abstract class WebCrawler {
@@ -3334,7 +3334,8 @@ public void run() {
 #### 7.3.1. Uncaught Exception Handlers
 
 `Thread` provides `UncaughtExceptionHandler`
-  - Detect when thread dies to uncaught exception
+
+- Detect when thread dies to uncaught exception
 - JVM reports uncaught exception to application-provided `UncaughtExceptionHandler`
   - Default is print stack trace to `System.err`
 
