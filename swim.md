@@ -1,6 +1,6 @@
 # SWIM (Scalable Weakly-Consistent Infection-Style Process Group Membership) Protocol
 
-#### https://www.cs.cornell.edu/~asdas/research/dsn02-swim.pdf
+#### http://www.cs.cornell.edu/projects/quicksilver/public_pdfs/SWIM.pdf
 
 ## 2 Previous work
 - Previous implementations rely either on:
